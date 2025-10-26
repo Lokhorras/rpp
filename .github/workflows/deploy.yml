@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   release:
     types: [published]
 
@@ -10,6 +10,10 @@ permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -23,126 +27,66 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Create build structure
+      
+    - name: Debug info
       run: |
-        # Создаем основную структуру
-        mkdir -p dist/ru
-        mkdir -p dist/en
+        echo "Event: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Tag: ${{ github.event.release.tag_name }}"
+      
+    - name: Create version directory for release
+      if: github.event_name == 'release'
+      run: |
+        TAG_NAME="${{ github.event.release.tag_name }}"
+        echo "Creating version directory for: $TAG_NAME"
+        mkdir -p "v${TAG_NAME}"
+        cp index.html "v${TAG_NAME}/"
+        cp -r ru en "v${TAG_NAME}/"
         
-        # Копируем файлы в основную директорию
-        cp index.html dist/
-        cp ru/index.html dist/ru/
-        cp en/index.html dist/en/
-        
-        # Если это релиз - создаем версионную директорию
-        if [ "${{ github.event_name }}" = "release" ]; then
-          mkdir -p dist/v${{ github.event.release.tag_name }}
-          cp index.html dist/v${{ github.event.release.tag_name }}/
-          cp -r ru dist/v${{ github.event.release.tag_name }}/
-          cp -r en dist/v${{ github.event.release.tag_name }}/
-          
-          # Создаем индекс для версионной директории
-          cat > dist/v${{ github.event.release.tag_name }}/index.html << EOF
+        # Create version-specific index page
+        cat > "v${TAG_NAME}/index.html" << EOF
         <!DOCTYPE html>
         <html lang="ru">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Версия ${{ github.event.release.tag_name }}</title>
+            <title>RPP $TAG_NAME</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 40px; }
-                nav { margin: 20px 0; }
+                .version-badge { 
+                    background: #0366d6; 
+                    color: white; 
+                    padding: 5px 10px; 
+                    border-radius: 3px; 
+                    font-size: 0.8em;
+                }
+                nav { margin: 20px 0; padding: 15px; background: #f6f8fa; }
                 a { margin: 0 10px; text-decoration: none; color: #0366d6; }
-                a:hover { text-decoration: underline; }
-                .version { background: #f6f8fa; padding: 10px; border-radius: 5px; }
             </style>
         </head>
         <body>
-            <div class="version">
-                <h1>Версия: ${{ github.event.release.tag_name }}</h1>
-                <p>Это архивная версия сайта от ${{ github.event.release.published_at }}</p>
-            </div>
-            
-            <h2>Добро пожаловать на наш сайт!</h2>
-            <p>Это версия ${{ github.event.release.tag_name }} нашего сайта.</p>
+            <h1>RPP Project <span class="version-badge">$TAG_NAME</span></h1>
+            <p><strong>Архивная версия:</strong> ${{ github.event.release.published_at }}</p>
+            <p>${{ github.event.release.body }}</p>
             
             <nav>
-                <strong>Навигация:</strong>
                 <a href="ru/index.html">Русская версия</a>
-                <a href="en/index.html">English version</a>
+                <a href="en/index.html">English Version</a>
                 <a href="../index.html">Текущая версия</a>
             </nav>
-            
-            <div>
-                <h3>О релизе</h3>
-                <p>${{ github.event.release.body }}</p>
-            </div>
         </body>
         </html>
         EOF
-        fi
-        
-    - name: Create versions index
-      run: |
-        # Создаем страницу со списком всех версий
-        cat > dist/versions.html << EOF
-        <!DOCTYPE html>
-        <html lang="ru">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Доступные версии</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .version-list { list-style: none; padding: 0; }
-                .version-item { padding: 10px; margin: 5px 0; background: #f6f8fa; border-radius: 5px; }
-                .current { background: #d4edda; }
-            </style>
-        </head>
-        <body>
-            <h1>Доступные версии сайта</h1>
-            <p>Все версии сохраняются и остаются доступными после выпуска новых релизов.</p>
+                echo "Version directory created successfully"
+
+            - name: Setup Pages
+            uses: actions/configure-pages@v4
             
-            <ul class="version-list">
-                <li class="version-item current">
-                    <strong><a href="index.html">Текущая версия (main)</a></strong>
-                    <br><em>Самая актуальная версия сайта</em>
-                </li>
-        EOF
-        
-        # Добавляем информацию о релизах если есть теги
-        if [ "${{ github.event_name }}" = "release" ]; then
-          echo '<li class="version-item">' >> dist/versions.html
-          echo "  <strong><a href=\"v${{ github.event.release.tag_name }}/index.html\">Версия ${{ github.event.release.tag_name }}</a></strong>" >> dist/versions.html
-          echo "  <br><em>Опубликована: ${{ github.event.release.published_at }}</em>" >> dist/versions.html
-          echo '</li>' >> dist/versions.html
-        fi
-        
-        cat >> dist/versions.html << EOF
-            </ul>
-            
-            <nav>
-                <a href="index.html">Вернуться на главную</a>
-            </nav>
-        </body>
-        </html>
-        EOF
-        
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-      
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: ./dist
-        
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+            - name: Upload artifact
+            uses: actions/upload-pages-artifact@v3
+            with:
+                path: .
+                
+            - name: Deploy to GitHub Pages
+            id: deployment
+            uses: actions/deploy-pages@v4
