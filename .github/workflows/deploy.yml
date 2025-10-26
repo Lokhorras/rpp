@@ -11,12 +11,8 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     
     steps:
@@ -24,9 +20,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
 
       - name: Create version directory for releases
         if: github.event_name == 'release'
@@ -38,89 +31,49 @@ jobs:
           mkdir -p "v${TAG_NAME}"
           
           # Копируем все файлы в версионную папку
-          cp -r index.html ru/ en/ "v${TAG_NAME}"/
+          cp -r index.html ru en "v${TAG_NAME}"/
           
           # Создаем кастомный index для версии
           cat > "v${TAG_NAME}/index.html" << EOF
-          <!DOCTYPE html>
-          <html lang="ru">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>RPP $TAG_NAME</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; }
-                  .version { background: #0366d6; color: white; padding: 5px 10px; border-radius: 3px; }
-                  nav { margin: 20px 0; padding: 15px; background: #f6f8fa; }
-                  a { margin: 0 10px; text-decoration: none; color: #0366d6; }
-              </style>
-          </head>
-          <body>
-              <h1>RPP Project <span class="version">$TAG_NAME</span></h1>
-              <p><strong>Архивная версия:</strong> ${{ github.event.release.published_at }}</p>
-              
-              <nav>
-                  <a href="ru/index.html">Русская версия</a>
-                  <a href="en/index.html">English Version</a>
-                  <a href="../index.html">Текущая версия</a>
-              </nav>
-              
-              <div>
-                  <h3>Описание релиза:</h3>
-                  <p>${{ github.event.release.body }}</p>
-              </div>
-          </body>
-          </html>
-          EOF
+            <!DOCTYPE html>
+            <html lang="ru">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>RPP $TAG_NAME</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .version { background: #0366d6; color: white; padding: 5px 10px; border-radius: 3px; }
+                    nav { margin: 20px 0; padding: 15px; background: #f6f8fa; }
+                    a { margin: 0 10px; text-decoration: none; color: #0366d6; }
+                </style>
+            </head>
+            <body>
+                <h1>RPP Project <span class="version">$TAG_NAME</span></h1>
+                <p><strong>Архивная версия:</strong> ${{ github.event.release.published_at }}</p>
+                
+                <nav>
+                    <a href="ru/index.html">Русская версия</a>
+                    <a href="en/index.html">English Version</a>
+                    <a href="../index.html">Текущая версия</a>
+                </nav>
+                
+                <div>
+                    <h3>Описание релиза:</h3>
+                    <p>${{ github.event.release.body }}</p>
+                </div>
+            </body>
+            </html>
+            EOF
                     echo "Version $TAG_NAME created successfully"
 
-                - name: Create versions index for regular builds
-                  if: github.event_name != 'release'
-                  run: |
-                    # Создаем страницу со списком всех версий
-                    cat > versions.html << EOF
-          <!DOCTYPE html>
-          <html lang="ru">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Все версии</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; }
-                  .version-list { margin: 20px 0; }
-                  .version-item { padding: 10px; border: 1px solid #ddd; margin: 5px 0; }
-              </style>
-          </head>
-          <body>
-              <h1>Все версии проекта</h1>
-              <nav>
-                  <a href="index.html">Главная</a>
-                  <a href="ru/index.html">Русская версия</a>
-                  <a href="en/index.html">English version</a>
-              </nav>
-              
-              <div class="version-list">
-                  <h2>Доступные версии:</h2>
-                  <p>Версии создаются автоматически при публикации релизов в GitHub.</p>
-              </div>
-          </body>
-          </html>
-          EOF
+                - name: Setup GitHub Pages
+                    uses: actions/configure-pages@v4
 
-                - name: Upload artifact
-                  uses: actions/upload-pages-artifact@v3
-                  with:
+                - name: Upload to GitHub Pages
+                    uses: actions/upload-pages-artifact@v3
+                    with:
                     path: .
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+                - name: Deploy to GitHub Pages
+                    uses: actions/deploy-pages@v4
