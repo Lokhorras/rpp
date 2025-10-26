@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   release:
     types: [published]
 
@@ -11,82 +11,69 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-      
-    - name: Debug info
-      run: |
-        echo "Event: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Tag: ${{ github.event.release.tag_name }}"
-      
-    - name: Create version directory for release
-      if: github.event_name == 'release'
-      run: |
-        TAG_NAME="${{ github.event.release.tag_name }}"
-        echo "Creating version directory for: $TAG_NAME"
-        mkdir -p "v${TAG_NAME}"
-        cp index.html "v${TAG_NAME}/"
-        cp -r ru en "v${TAG_NAME}/"
-        
-        # Create version-specific index page
-        cat > "v${TAG_NAME}/index.html" << EOF
-        <!DOCTYPE html>
-        <html lang="ru">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>RPP $TAG_NAME</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .version-badge { 
-                    background: #0366d6; 
-                    color: white; 
-                    padding: 5px 10px; 
-                    border-radius: 3px; 
-                    font-size: 0.8em;
-                }
-                nav { margin: 20px 0; padding: 15px; background: #f6f8fa; }
-                a { margin: 0 10px; text-decoration: none; color: #0366d6; }
-            </style>
-        </head>
-        <body>
-            <h1>RPP Project <span class="version-badge">$TAG_NAME</span></h1>
-            <p><strong>Архивная версия:</strong> ${{ github.event.release.published_at }}</p>
-            <p>${{ github.event.release.body }}</p>
-            
-            <nav>
-                <a href="ru/index.html">Русская версия</a>
-                <a href="en/index.html">English Version</a>
-                <a href="../index.html">Текущая версия</a>
-            </nav>
-        </body>
-        </html>
-        EOF
-                echo "Version directory created successfully"
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Setup Pages
-            uses: actions/configure-pages@v4
-            
-            - name: Upload artifact
-            uses: actions/upload-pages-artifact@v3
-            with:
-                path: .
+      - name: Create version directory for releases
+        if: github.event_name == 'release'
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          echo "Creating version directory: $TAG_NAME"
+          
+          # Создаем папку версии
+          mkdir -p "v${TAG_NAME}"
+          
+          # Копируем все файлы в версионную папку
+          cp -r index.html ru en "v${TAG_NAME}"/
+          
+          # Создаем кастомный index для версии
+          cat > "v${TAG_NAME}/index.html" << EOF
+            <!DOCTYPE html>
+            <html lang="ru">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>RPP $TAG_NAME</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .version { background: #0366d6; color: white; padding: 5px 10px; border-radius: 3px; }
+                    nav { margin: 20px 0; padding: 15px; background: #f6f8fa; }
+                    a { margin: 0 10px; text-decoration: none; color: #0366d6; }
+                </style>
+            </head>
+            <body>
+                <h1>RPP Project <span class="version">$TAG_NAME</span></h1>
+                <p><strong>Архивная версия:</strong> ${{ github.event.release.published_at }}</p>
                 
-            - name: Deploy to GitHub Pages
-            id: deployment
-            uses: actions/deploy-pages@v4
+                <nav>
+                    <a href="ru/index.html">Русская версия</a>
+                    <a href="en/index.html">English Version</a>
+                    <a href="../index.html">Текущая версия</a>
+                </nav>
+                
+                <div>
+                    <h3>Описание релиза:</h3>
+                    <p>${{ github.event.release.body }}</p>
+                </div>
+            </body>
+            </html>
+            EOF
+                    echo "Version $TAG_NAME created successfully"
+
+                - name: Setup GitHub Pages
+                    uses: actions/configure-pages@v4
+
+                - name: Upload to GitHub Pages
+                    uses: actions/upload-pages-artifact@v3
+                    with:
+                    path: .
+
+                - name: Deploy to GitHub Pages
+                    uses: actions/deploy-pages@v4
